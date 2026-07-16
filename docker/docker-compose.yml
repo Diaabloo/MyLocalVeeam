@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # 1. Base de données de production fictive (Data Source)
+  production_db:
+    image: postgres:15-alpine
+    container_name: veeam_production_db
+    environment:
+      POSTGRES_USER: ubs_prod_user
+      POSTGRES_PASSWORD: SecretProdPassword123!
+      POSTGRES_DB: app_production
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    networks:
+      - veeam_network
+
+  # 2. S3 Storage Local (MinIO)
+  minio_s3:
+    image: minio/minio:latest
+    container_name: veeam_storage_minio
+    ports:
+      - "9000:9000"  # API S3
+      - "9001:9001"  # Console d'administration Web
+    environment:
+      MINIO_ROOT_USER: minio_root_admin
+      MINIO_ROOT_PASSWORD: minio_secure_password_99
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_backup_data:/data
+    networks:
+      - veeam_network
+
+  # 3. Security KMS (HashiCorp Vault)
+  vault_kms:
+    image: hashicorp/vault:1.15
+    container_name: veeam_kms_vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "veeam-root-token"
+      VAULT_ADDR: "http://0.0.0.0:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - veeam_network
+
+  # 4. Le Control Plane (Ton application Go)
+  veeam_api:
+    build:
+      context: ..
+      dockerfile: docker/app.Dockerfile
+    container_name: veeam_control_plane
+    ports:
+      - "8080:8080"
+    environment:
+      - VAULT_TOKEN=veeam-root-token
+      - VAULT_URL=http://vault_kms:8200
+      - S3_ENDPOINT=http://minio_s3:9000
+      - S3_ACCESS_KEY=minio_root_admin
+      - S3_SECRET_KEY=minio_secure_password_99
+      - DB_HOST=production_db
+    depends_on:
+      - production_db
+      - minio_s3
+      - vault_kms
+    networks:
+      - veeam_network
+
+networks:
+  veeam_network:
+    driver: bridge
+
+volumes:
+  pg_prod_data:
+  minio_backup_data:
