@@ -1,11 +1,13 @@
 services:
+  # Base de données PostgreSQL de production simulée
   production_db:
     image: postgres:15-alpine
     container_name: production_db
     environment:
       POSTGRES_DB: app_production
       POSTGRES_USER: ubs_prod_user
-      POSTGRES_PASSWORD: SecretProdPassword123!
+      # Mot de passe injecté dynamiquement depuis le fichier .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -13,12 +15,14 @@ services:
     networks:
       - veeam_network
 
-  minio_s3:
+  # Serveur de stockage objet (compatible S3) pour héberger les sauvegardes
+  minio-s3:
     image: minio/minio:latest
-    container_name: minio_s3
+    container_name: minio-s3
     environment:
       MINIO_ROOT_USER: minio_root_admin
-      MINIO_ROOT_PASSWORD: minio_secure_password_99
+      # Mot de passe administrateur injecté depuis le fichier .env
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     ports:
       - "9005:9000"
@@ -28,15 +32,19 @@ services:
     networks:
       - veeam_network
 
+  # Serveur HashiCorp Vault (KMS) pour centraliser la clé de chiffrement
   vault_kms:
     image: hashicorp/vault:1.15
     container_name: vault_kms
     cap_add:
       - IPC_LOCK
     environment:
+      # Configuration locale pour le mode développement de Vault
       VAULT_DEV_ROOT_TOKEN_ID: veeam-root-token
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
       VAULT_ADDR: http://127.0.0.1:8200
+      # La passphrase est injectée via .env puis stockée dans Vault au démarrage
+      VAULT_BACKUP_PASSPHRASE: ${VAULT_BACKUP_PASSPHRASE}
     command: >
       sh -c "vault server -dev -dev-root-token-id=\"$${VAULT_DEV_ROOT_TOKEN_ID}\" -dev-listen-address=\"$${VAULT_DEV_LISTEN_ADDRESS}\" -log-level=warn & /vault/config/vault-init.sh && wait"
     ports:
@@ -46,6 +54,7 @@ services:
     networks:
       - veeam_network
 
+  # API Backend Go et Orchestrateur des sauvegardes (MyLocalVeeam)
   veeam_api:
     build:
       context: ..
@@ -54,22 +63,25 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Identifiants de la base de données
       PGHOST: production_db
       PGPORT: "5432"
       PGDATABASE: app_production
       PGUSER: ubs_prod_user
-      DB_PASSWORD: SecretProdPassword123!
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Connexion vers Vault pour récupérer la passphrase
       VAULT_ADDR: http://vault_kms:8200
       VAULT_TOKEN: veeam-root-token
       VAULT_SECRET_PATH: secret/data/backups/postgres
       VAULT_SECRET_KEY: passphrase
-      MINIO_ENDPOINT: http://minio_s3:9000
+      # Connexion vers MinIO pour uploader la sauvegarde
+      MINIO_ENDPOINT: http://minio-s3:9000
       MINIO_ACCESS_KEY: minio_root_admin
-      MINIO_SECRET_KEY: minio_secure_password_99
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: secure-backups
     depends_on:
       - production_db
-      - minio_s3
+      - minio-s3
       - vault_kms
     networks:
       - veeam_network

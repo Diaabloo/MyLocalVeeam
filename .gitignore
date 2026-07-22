@@ -24,3 +24,7 @@ override.tf.json
 # OS / editor files
 .DS_Store
 Thumbs.db
+
+# Secrets & Environment variables
+.env
+**/.env
