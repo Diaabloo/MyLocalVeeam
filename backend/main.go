@@ -17,6 +17,7 @@ type backupResponse struct {
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/backup", backupHandler)
+	mux.HandleFunc("/api/restore", restoreHandler)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -31,7 +32,8 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Sécurisation CORS (restriction à l'origine du frontend Next.js)
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
@@ -73,6 +75,39 @@ func backupHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, backupResponse{
 		Status:  "Success",
 		Message: "backup completed successfully",
+		Logs:    logs,
+	})
+}
+
+func restoreHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, backupResponse{
+			Status:  "Failed",
+			Message: "method not allowed",
+		})
+		return
+	}
+
+	log.Printf("received restore request from %s", r.RemoteAddr)
+
+	cmd := exec.Command("/bin/bash", "/app/scripts/restore.sh")
+	output, err := cmd.CombinedOutput()
+	logs := string(output)
+
+	if err != nil {
+		log.Printf("restore script failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, backupResponse{
+			Status:  "Failed",
+			Message: fmt.Sprintf("restore failed: %v", err),
+			Logs:    logs,
+		})
+		return
+	}
+
+	log.Println("restore script completed successfully")
+	writeJSON(w, http.StatusOK, backupResponse{
+		Status:  "Success",
+		Message: "restore completed successfully",
 		Logs:    logs,
 	})
 }

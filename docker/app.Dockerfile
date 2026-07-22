@@ -18,7 +18,11 @@ WORKDIR /app
 COPY --from=builder /out/mylocalveeam-api /app/mylocalveeam-api
 COPY scripts/ /app/scripts/
 
-RUN find /app/scripts -type f -name '*.sh' -exec chmod +x {} +
+RUN addgroup -S veeamgroup && adduser -S veeamuser -G veeamgroup \
+	&& chown -R veeamuser:veeamgroup /app \
+	&& find /app/scripts -type f -name '*.sh' -exec chmod +x {} +
+
+USER veeamuser
 
 EXPOSE 8080
 

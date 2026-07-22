@@ -62,7 +62,7 @@ done
 : "${MINIO_BUCKET:?MINIO_BUCKET is required}"
 : "${MINIO_PREFIX:=postgres-backups}"
 : "${BACKUP_NAME:=${PGDATABASE}-$(date -u +%Y%m%dT%H%M%SZ)}"
-: "${OPENSSL_ITERATIONS:=200000}"
+: "${OPENSSL_ITERATIONS:=600000}"
 
 workdir="$(mktemp -d)"
 pgpass_file="$workdir/.pgpass"

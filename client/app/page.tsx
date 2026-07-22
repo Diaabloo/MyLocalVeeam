@@ -62,39 +62,32 @@ export default function Page() {
     window.setTimeout(() => setToast(null), 3500)
   }
 
-  function handleTriggerBackup() {
+  async function handleTriggerBackup() {
     if (isBackingUp) return
     setIsBackingUp(true)
     const db = DATABASES[Math.floor(Math.random() * DATABASES.length)]
     const id = `bkp_${randomHex(6)}`
 
-    const steps: Array<[number, LogLine["level"], string]> = [
-      [200, "INFO", `Dumping database ${db} via pg_dump`],
-      [1000, "SEC", "Fetching AES-256 data key from KMS Vault"],
-      [1800, "SEC", "Encrypting dump with envelope encryption"],
-      [2600, "S3", "Uploading to secure-backups bucket (MinIO)"],
-    ]
-    steps.forEach(([delay, level, message]) =>
-      window.setTimeout(() => pushLog(level, message), delay),
-    )
+    pushLog("INFO", `Initiating API backup request for ${db}...`)
 
-    window.setTimeout(() => {
-      const size = `${(Math.random() * 60 + 5).toFixed(1)} MB`
-      setBackups((prev) => [
-        {
-          id,
-          timestamp: timestamp(),
-          database: db,
-          size,
-          encryption: "AES-256",
-          status: "success",
-        },
-        ...prev,
-      ])
-      pushLog("INFO", `Backup ${id} completed — ${size}`)
-      setIsBackingUp(false)
+    try {
+      const res = await fetch("http://localhost:8080/api/backup", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Backup failed")
+
+      const size = `${(Math.random() * 60 + 5).toFixed(1)} MB` // À l'avenir, l'API devrait retourner la taille réelle
+      setBackups((prev) => [{
+        id, timestamp: timestamp(), database: db, size, encryption: "AES-256", status: "success"
+      }, ...prev])
+      
+      pushLog("INFO", `Backup ${id} completed successfully via API.`)
       showToast(`Backup ${id} completed successfully`)
-    }, 3400)
+    } catch (err: any) {
+      pushLog("ERR", `Backup API failed: ${err.message}`)
+      showToast(`Backup failed: ${err.message}`)
+    } finally {
+      setIsBackingUp(false)
+    }
   }
 
   function handleTestRestore() {
@@ -116,27 +109,25 @@ export default function Page() {
     }, 2600)
   }
 
-  function handleConfirmRestore() {
+  async function handleConfirmRestore() {
     if (!restoreTarget) return
     setIsRestoring(true)
-    pushLog("SEC", `Fetching AES-256 key to restore ${restoreTarget.id}`)
-    window.setTimeout(
-      () =>
-        pushLog(
-          "S3",
-          `Downloading ${restoreTarget.id} from secure-backups bucket`,
-        ),
-      900,
-    )
-    window.setTimeout(() => {
-      pushLog(
-        "INFO",
-        `Restored ${restoreTarget.database} from ${restoreTarget.id}`,
-      )
-      setIsRestoring(false)
+    pushLog("INFO", `Initiating API restore request for ${restoreTarget.id}...`)
+
+    try {
+      const res = await fetch("http://localhost:8080/api/restore", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Restore failed")
+
+      pushLog("INFO", `Restored ${restoreTarget.database} successfully via API.`)
       showToast(`Restored ${restoreTarget.database} successfully`)
       setRestoreTarget(null)
-    }, 2100)
+    } catch (err: any) {
+      pushLog("ERR", `Restore API failed: ${err.message}`)
+      showToast(`Restore failed: ${err.message}`)
+    } finally {
+      setIsRestoring(false)
+    }
   }
 
   return (

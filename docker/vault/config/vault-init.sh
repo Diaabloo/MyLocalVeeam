@@ -22,8 +22,8 @@ fi
 
 log "seeding backup passphrase"
 if [ -z "${VAULT_BACKUP_PASSPHRASE:-}" ]; then
-	log "WARNING: VAULT_BACKUP_PASSPHRASE is not set. Using fallback passphrase."
-	VAULT_BACKUP_PASSPHRASE="MaCleDeChiffrementUltraSecreteVeeam2026!"
+	log "ERROR: VAULT_BACKUP_PASSPHRASE is not set. Cannot initialize Vault safely."
+	exit 1
 fi
 
 vault kv put secret/backups/postgres passphrase="${VAULT_BACKUP_PASSPHRASE}" >/dev/null
