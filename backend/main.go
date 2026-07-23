@@ -75,7 +75,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"status": "Failed", "message": "method not allowed"})
+		json.NewEncoder(w).Encode(map[string]string{"status": "failed", "message": "method not allowed"})
 		return
 	}
 
@@ -107,7 +107,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to list backups from minio: %v, output: %s", err, string(output))
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"status": "Failed", "message": "failed to list backups"})
+		json.NewEncoder(w).Encode(map[string]string{"status": "failed", "message": "failed to list backups"})
 		return
 	}
 
@@ -144,7 +144,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 			Database:  dbName,
 			Size:      sizeStr,
 			Timestamp: obj.LastModified,
-			Status:    "Success",
+			Status:    "success",
 			Location:  "minio/" + bucket + "/" + obj.Key,
 		})
 	}
@@ -161,7 +161,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 func backupHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, backupResponse{
-			Status:  "Failed",
+			Status:  "failed",
 			Message: "method not allowed",
 		})
 		return
@@ -176,7 +176,7 @@ func backupHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("backup script failed: %v", err)
 		writeJSON(w, http.StatusInternalServerError, backupResponse{
-			Status:  "Failed",
+			Status:  "failed",
 			Message: fmt.Sprintf("backup failed: %v", err),
 			Logs:    logs,
 		})
@@ -185,7 +185,7 @@ func backupHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("backup script completed successfully")
 	writeJSON(w, http.StatusOK, backupResponse{
-		Status:  "Success",
+		Status:  "success",
 		Message: "backup completed successfully",
 		Logs:    logs,
 	})
@@ -194,7 +194,7 @@ func backupHandler(w http.ResponseWriter, r *http.Request) {
 func restoreHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, backupResponse{
-			Status:  "Failed",
+			Status:  "failed",
 			Message: "method not allowed",
 		})
 		return
@@ -229,7 +229,7 @@ func restoreHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("restore script failed: %v", err)
 		writeJSON(w, http.StatusInternalServerError, backupResponse{
-			Status:  "Failed",
+			Status:  "failed",
 			Message: fmt.Sprintf("restore failed: %v", err),
 			Logs:    logs,
 		})
@@ -238,7 +238,7 @@ func restoreHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("restore script completed successfully")
 	writeJSON(w, http.StatusOK, backupResponse{
-		Status:  "Success",
+		Status:  "success",
 		Message: "restore completed successfully",
 		Logs:    logs,
 	})
