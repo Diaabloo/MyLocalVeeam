@@ -8,7 +8,7 @@ RUN GO111MODULE=off CGO_ENABLED=0 go build -o /out/mylocalveeam-api .
 
 FROM alpine:3.20
 
-RUN apk add --no-cache bash postgresql-client openssl curl python3 ca-certificates sha256sum \
+RUN apk add --no-cache bash postgresql-client openssl curl python3 ca-certificates coreutils \
 	&& update-ca-certificates \
 	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc \
 	# Vérification du checksum pour sécuriser la supply chain
