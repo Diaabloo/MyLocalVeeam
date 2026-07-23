@@ -200,9 +200,29 @@ func restoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("received restore request from %s", r.RemoteAddr)
+	// Structure pour décoder le JSON envoyé par le frontend
+	var req struct {
+		BackupID string `json:"backupId"`
+		Location string `json:"location"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
 
-	cmd := exec.Command("/bin/bash", "/app/scripts/restore.sh")
+	target := req.Location
+	if target == "" {
+		target = req.BackupID
+	}
+
+	log.Printf("received restore request from %s for target: '%s'", r.RemoteAddr, target)
+
+	var cmd *exec.Cmd
+	if target != "" {
+		cmd = exec.Command("/bin/bash", "/app/scripts/restore.sh", target)
+	} else {
+		cmd = exec.Command("/bin/bash", "/app/scripts/restore.sh")
+	}
+
 	output, err := cmd.CombinedOutput()
 	logs := string(output)
 
