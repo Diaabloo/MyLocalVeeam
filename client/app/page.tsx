@@ -60,20 +60,22 @@ export default function Page() {
     window.setTimeout(() => setToast(null), 3500)
   }
 
+  async function fetchDashboardData() {
+    try {
+      const res = await fetch("http://localhost:8080/api/backups")
+      if (res.ok) {
+        const data = await res.json()
+        if (data.backups) setBackups(data.backups)
+        return true
+      }
+    } catch (err) {
+      pushLog("ERROR", "Could not connect to backend API to fetch history.")
+    }
+    return false
+  }
+
   // Client d'API dynamique : Chargement initial de l'historique
   useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        // TODO: Implémenter la route GET /api/backups côté Go pour lister le contenu de MinIO / BDD
-        const res = await fetch("http://localhost:8080/api/backups")
-        if (res.ok) {
-          const data = await res.json()
-          if (data.backups) setBackups(data.backups)
-        }
-      } catch (err) {
-        pushLog("ERROR", "Could not connect to backend API to fetch history.")
-      }
-    }
     fetchDashboardData()
   }, [])
 
@@ -81,7 +83,6 @@ export default function Page() {
     if (isBackingUp) return
     setIsBackingUp(true)
     const db = DATABASES[Math.floor(Math.random() * DATABASES.length)]
-    const id = `bkp_${randomHex(6)}`
 
     pushLog("INFO", `Initiating API backup request for ${db}...`)
 
@@ -97,13 +98,14 @@ export default function Page() {
 
       if (!res.ok) throw new Error(data.message || "Backup failed")
 
-      const size = `${(Math.random() * 60 + 5).toFixed(1)} MB` // À l'avenir, l'API devrait retourner la taille réelle
-      setBackups((prev) => [{
-        id, timestamp: timestamp(), database: db, size, encryption: "AES-256", status: "success"
-      }, ...prev])
-      
-      pushLog("INFO", `Backup ${id} completed successfully via API.`)
-      showToast(`Backup ${id} completed successfully`)
+      pushLog("INFO", "Backup request successful. Refreshing backup list...")
+      const fetchSuccess = await fetchDashboardData()
+
+      if (fetchSuccess) {
+        showToast(`Backup completed and list updated.`)
+      } else {
+        showToast(`Backup completed, but failed to refresh list.`)
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error"
       pushLog("ERROR", `Backup API failed: ${errorMessage}`)
