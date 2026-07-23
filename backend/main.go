@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"strings"
 )
 
 type backupResponse struct {
@@ -16,6 +20,7 @@ type backupResponse struct {
 
 func main() {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/backups", listBackupsHandler)
 	mux.HandleFunc("/api/backup", backupHandler)
 	mux.HandleFunc("/api/restore", restoreHandler)
 
@@ -34,7 +39,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Sécurisation CORS (restriction à l'origine du frontend Next.js)
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		if r.Method == http.MethodOptions {
@@ -44,6 +49,113 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+type backupItem struct {
+	ID        string `json:"id"`
+	Database  string `json:"database"`
+	Size      string `json:"size"`
+	Timestamp string `json:"timestamp"`
+	Status    string `json:"status"`
+	Location  string `json:"location"`
+}
+
+type listBackupsResponse struct {
+	Backups []backupItem `json:"backups"`
+}
+
+type mcObject struct {
+	Key          string `json:"key"`
+	Size         int64  `json:"size"`
+	LastModified string `json:"lastModified"`
+	Type         string `json:"type"`
+}
+
+func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"status": "Failed", "message": "method not allowed"})
+		return
+	}
+
+	log.Printf("received list backups request from %s", r.RemoteAddr)
+
+	bucket := os.Getenv("MINIO_BUCKET")
+	if bucket == "" {
+		bucket = "secure-backups"
+	}
+
+	// Construction de l'alias MinIO pour mc
+	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
+	accessKey := os.Getenv("MINIO_ACCESS_KEY")
+	secretKey := os.Getenv("MINIO_SECRET_KEY")
+
+	var mcHost string
+	if strings.HasPrefix(minioEndpoint, "https://") {
+		mcHost = "https://" + accessKey + ":" + secretKey + "@" + strings.TrimPrefix(minioEndpoint, "https://")
+	} else {
+		mcHost = "http://" + accessKey + ":" + secretKey + "@" + strings.TrimPrefix(minioEndpoint, "http://")
+	}
+
+	// Exécution de la commande d'énumération en JSON
+	cmd := exec.Command("mc", "ls", "--json", "--recursive", "minio/"+bucket)
+	cmd.Env = append(os.Environ(), "MC_HOST_minio="+mcHost)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("failed to list backups from minio: %v, output: %s", err, string(output))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"status": "Failed", "message": "failed to list backups"})
+		return
+	}
+
+	var backups []backupItem
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+
+		var obj mcObject
+		if err := json.Unmarshal(line, &obj); err != nil {
+			log.Printf("failed to parse mc json line: %v", err)
+			continue
+		}
+
+		if obj.Type != "file" {
+			continue
+		}
+
+		// Le Key MinIO ressemble à: postgres-backups/app_production/app_production-2023.dump.enc
+		parts := strings.Split(obj.Key, "/")
+		dbName := "unknown"
+		if len(parts) >= 2 {
+			dbName = parts[len(parts)-2]
+		}
+
+		sizeMB := float64(obj.Size) / (1024 * 1024)
+		sizeStr := fmt.Sprintf("%.1f MB", sizeMB)
+
+		backups = append(backups, backupItem{
+			ID:        parts[len(parts)-1], // On utilise le nom final du fichier comme ID unique
+			Database:  dbName,
+			Size:      sizeStr,
+			Timestamp: obj.LastModified,
+			Status:    "Success",
+			Location:  "minio/" + bucket + "/" + obj.Key,
+		})
+	}
+
+	if backups == nil {
+		backups = []backupItem{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(listBackupsResponse{Backups: backups})
 }
 
 func backupHandler(w http.ResponseWriter, r *http.Request) {
