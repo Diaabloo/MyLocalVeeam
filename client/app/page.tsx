@@ -71,7 +71,7 @@ export default function Page() {
           if (data.backups) setBackups(data.backups)
         }
       } catch (err) {
-        pushLog("ERR", "Could not connect to backend API to fetch history.")
+        pushLog("ERROR", "Could not connect to backend API to fetch history.")
       }
     }
     fetchDashboardData()
@@ -104,9 +104,10 @@ export default function Page() {
       
       pushLog("INFO", `Backup ${id} completed successfully via API.`)
       showToast(`Backup ${id} completed successfully`)
-    } catch (err: any) {
-      pushLog("ERR", `Backup API failed: ${err.message}`)
-      showToast(`Backup failed: ${err.message}`)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      pushLog("ERROR", `Backup API failed: ${errorMessage}`)
+      showToast(`Backup failed: ${errorMessage}`)
     } finally {
       setIsBackingUp(false)
     }
@@ -137,7 +138,16 @@ export default function Page() {
     pushLog("INFO", `Initiating API restore request for ${restoreTarget.id}...`)
 
     try {
-      const res = await fetch("http://localhost:8080/api/restore", { method: "POST" })
+      const res = await fetch("http://localhost:8080/api/restore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          backupId: restoreTarget.id,
+          location: (restoreTarget as Backup & { location?: string }).location || "",
+        }),
+      })
       const data = await res.json()
 
       // Affichage dynamique des logs de restauration
@@ -151,9 +161,10 @@ export default function Page() {
       pushLog("INFO", `Restored ${restoreTarget.database} successfully via API.`)
       showToast(`Restored ${restoreTarget.database} successfully`)
       setRestoreTarget(null)
-    } catch (err: any) {
-      pushLog("ERR", `Restore API failed: ${err.message}`)
-      showToast(`Restore failed: ${err.message}`)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      pushLog("ERROR", `Restore API failed: ${errorMessage}`)
+      showToast(`Restore failed: ${errorMessage}`)
     } finally {
       setIsRestoring(false)
     }
@@ -181,7 +192,7 @@ export default function Page() {
           <div className="xl:col-span-2">
             <BackupsTable backups={backups} onRestore={setRestoreTarget} />
           </div>
-          <div className="min-h-[420px] xl:col-span-1">
+          <div className="min-h-105 xl:col-span-1">
             <LogsPanel logs={logs} />
           </div>
         </div>
