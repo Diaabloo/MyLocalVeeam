@@ -29,11 +29,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
+          cache: false
 
       - name: Run Go Tests
+        env:
+          GO111MODULE: off
         run: |
           cd backend
-          go test -v ./...
+          go test -v .
 
   build-and-push:
     name: Build, Scan & Push to GHCR
