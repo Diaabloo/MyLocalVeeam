@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CheckCircle2 } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { QuickActions } from "@/components/quick-actions"
@@ -10,8 +10,6 @@ import { LogsPanel } from "@/components/logs-panel"
 import { RestoreDialog } from "@/components/restore-dialog"
 import {
   DATABASES,
-  initialBackups,
-  initialLogs,
   randomHex,
   type Backup,
   type LogLine,
@@ -30,8 +28,8 @@ function timestamp() {
 }
 
 export default function Page() {
-  const [backups, setBackups] = useState<Backup[]>(initialBackups)
-  const [logs, setLogs] = useState<LogLine[]>(initialLogs)
+  const [backups, setBackups] = useState<Backup[]>([])
+  const [logs, setLogs] = useState<LogLine[]>([])
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [restoreTarget, setRestoreTarget] = useState<Backup | null>(null)
@@ -62,6 +60,23 @@ export default function Page() {
     window.setTimeout(() => setToast(null), 3500)
   }
 
+  // Client d'API dynamique : Chargement initial de l'historique
+  useEffect(() => {
+    async function fetchDashboardData() {
+      try {
+        // TODO: Implémenter la route GET /api/backups côté Go pour lister le contenu de MinIO / BDD
+        const res = await fetch("http://localhost:8080/api/backups")
+        if (res.ok) {
+          const data = await res.json()
+          if (data.backups) setBackups(data.backups)
+        }
+      } catch (err) {
+        pushLog("ERR", "Could not connect to backend API to fetch history.")
+      }
+    }
+    fetchDashboardData()
+  }, [])
+
   async function handleTriggerBackup() {
     if (isBackingUp) return
     setIsBackingUp(true)
@@ -73,6 +88,13 @@ export default function Page() {
     try {
       const res = await fetch("http://localhost:8080/api/backup", { method: "POST" })
       const data = await res.json()
+
+      // Affiche les logs console de ton script bash directement dans le Dashboard
+      if (data.logs) {
+        const logLines = data.logs.split('\n').filter((l: string) => l.trim() !== '')
+        logLines.forEach((line: string) => pushLog("INFO", line))
+      }
+
       if (!res.ok) throw new Error(data.message || "Backup failed")
 
       const size = `${(Math.random() * 60 + 5).toFixed(1)} MB` // À l'avenir, l'API devrait retourner la taille réelle
@@ -117,6 +139,13 @@ export default function Page() {
     try {
       const res = await fetch("http://localhost:8080/api/restore", { method: "POST" })
       const data = await res.json()
+
+      // Affichage dynamique des logs de restauration
+      if (data.logs) {
+        const logLines = data.logs.split('\n').filter((l: string) => l.trim() !== '')
+        logLines.forEach((line: string) => pushLog("INFO", line))
+      }
+
       if (!res.ok) throw new Error(data.message || "Restore failed")
 
       pushLog("INFO", `Restored ${restoreTarget.database} successfully via API.`)
