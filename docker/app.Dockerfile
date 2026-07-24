@@ -14,7 +14,7 @@ RUN apk add --no-cache bash postgresql-client openssl curl python3 ca-certificat
 	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o mc \
 	# Dynamic checksum verification using MinIO's official signature
 	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc.sha256sum -o mc.sha256sum \
-	&& sha256sum -c mc.sha256sum \
+	&& awk 'NR==1 {print $1 "  mc"}' mc.sha256sum | sha256sum -c - \
 	&& rm mc.sha256sum \
 	&& chmod +x mc
 
