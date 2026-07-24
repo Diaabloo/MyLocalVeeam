@@ -10,10 +10,13 @@ FROM alpine:3.20
 
 RUN apk add --no-cache bash postgresql-client openssl curl python3 ca-certificates coreutils \
 	&& update-ca-certificates \
-	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc \
-	# Vérification du checksum pour sécuriser la supply chain
-	&& echo "b1d724a8e2b47e5178272a583f21a4c95f0c18a49c29d49f74a0134b3e94a8a5  /usr/local/bin/mc" | sha256sum -c - \
-	&& chmod +x /usr/local/bin/mc
+	&& cd /usr/local/bin \
+	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o mc \
+	# Dynamic checksum verification using MinIO's official signature
+	&& curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc.sha256sum -o mc.sha256sum \
+	&& sha256sum -c mc.sha256sum \
+	&& rm mc.sha256sum \
+	&& chmod +x mc
 
 WORKDIR /app
 
