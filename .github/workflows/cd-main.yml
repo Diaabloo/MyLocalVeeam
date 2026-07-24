@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
           cache: false
 
       - name: Run Go Tests
@@ -48,7 +48,7 @@ jobs:
           tags: mylocalveeam-api:release
 
       - name: Vulnerability Scan with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: 'mylocalveeam-api:release'
           format: 'table'
