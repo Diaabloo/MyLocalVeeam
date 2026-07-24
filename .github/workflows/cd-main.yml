@@ -48,7 +48,7 @@ jobs:
           tags: mylocalveeam-api:release
 
       - name: Vulnerability Scan with Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'mylocalveeam-api:release'
           format: 'table'
