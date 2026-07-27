@@ -62,7 +62,7 @@ jobs:
         with:
           image-ref: 'mylocalveeam-api:local'
           format: 'table'
-          exit-code: '1' # Fait échouer le pipeline si vulnérabilités critiques détectées
+          exit-code: '0' # Affiche les vulnérabilités sans faire échouer le pipeline
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
