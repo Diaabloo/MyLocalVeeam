@@ -6,3 +6,4 @@
 # Ignorer temporairement les vulnérabilités upstream en attendant un correctif dans Go/Alpine
 CVE-2025-47913
 CVE-2026-42504
+CVE-2026-42499
