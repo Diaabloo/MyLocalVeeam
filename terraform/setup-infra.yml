@@ -1,0 +1,41 @@
+# ==============================================================================
+# Ansible Playbook: Setup Infrastructure VM
+# Description: Installs Docker and starts MinIO, Vault, and PostgreSQL.
+# ==============================================================================
+---
+- name: Configure Infrastructure Services
+  hosts: infrastructure
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Docker and dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - docker.io
+          - docker-compose
+          - python3-docker # Required for the Ansible docker_compose module
+        state: present
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Copy docker-compose.yml to VM
+      copy:
+        src: ../docker/docker-compose.yml
+        dest: /opt/infrastructure/docker-compose.yml
+
+    - name: Start Infrastructure Containers
+      community.docker.docker_compose:
+        project_src: /opt/infrastructure
+        state: present
+        build: yes
