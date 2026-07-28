@@ -1,3 +1,9 @@
+/**
+ * ==============================================================================
+ * Main Dashboard Page
+ * Description: Renders the frontend interface to manage and orchestrate backups.
+ * ==============================================================================
+ */
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -74,7 +80,7 @@ export default function Page() {
     return false
   }
 
-  // Client d'API dynamique : Chargement initial de l'historique
+  // Dynamic API Client: Initial loading of backup history on mount
   useEffect(() => {
     fetchDashboardData()
   }, [])
@@ -90,7 +96,7 @@ export default function Page() {
       const res = await fetch("http://localhost:8080/api/backup", { method: "POST" })
       const data = await res.json()
 
-      // Affiche les logs console de ton script bash directement dans le Dashboard
+      // Display the bash script console logs directly in the Dashboard UI
       if (data.logs) {
         const logLines = data.logs.split('\n').filter((l: string) => l.trim() !== '')
         logLines.forEach((line: string) => pushLog("INFO", line))
@@ -152,7 +158,7 @@ export default function Page() {
       })
       const data = await res.json()
 
-      // Affichage dynamique des logs de restauration
+      // Dynamically render the bash restore script logs
       if (data.logs) {
         const logLines = data.logs.split('\n').filter((l: string) => l.trim() !== '')
         logLines.forEach((line: string) => pushLog("INFO", line))
