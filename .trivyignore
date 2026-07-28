@@ -1,9 +1,14 @@
-# Ignore les vulnérabilités trouvées dans le binaire pré-compilé du client MinIO.
-# C'est un choix pragmatique pour débloquer la pipeline, car nous ne contrôlons pas ses dépendances.
-# Le risque est considéré comme faible car il s'agit d'un outil client utilisé pour des commandes spécifiques.
+# ==============================================================================
+# Trivy Ignore File
+# Description: Specifies CVEs and files to be ignored during the Trivy security scan.
+# ==============================================================================
+
+# Ignore vulnerabilities found in the pre-compiled MinIO client binary.
+# This is a pragmatic choice to unblock the pipeline as we don't control its dependencies.
+# The risk is considered low since it's a client tool used for specific commands.
 /usr/local/bin/mc
 
-# Ignorer temporairement les vulnérabilités upstream en attendant un correctif dans Go/Alpine
+# Temporarily ignore upstream vulnerabilities pending a fix in Go/Alpine
 CVE-2025-47913
 CVE-2026-42504
 CVE-2026-42499
