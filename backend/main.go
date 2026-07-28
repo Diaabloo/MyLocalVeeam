@@ -1,3 +1,10 @@
+// ==============================================================================
+// Package main: MyLocalVeeam Backend API
+// Description: Exposes REST API endpoints for initiating PostgreSQL backups,
+//
+//	restoring from MinIO, and listing available backups in the bucket.
+//
+// ==============================================================================
 package main
 
 import (
@@ -12,6 +19,7 @@ import (
 	"strings"
 )
 
+// backupResponse represents the standard JSON payload returned by API endpoints.
 type backupResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
@@ -35,9 +43,10 @@ func main() {
 	}
 }
 
+// corsMiddleware handles Cross-Origin Resource Sharing settings.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Sécurisation CORS (restriction à l'origine du frontend Next.js)
+		// CORS Security (Restrict allowed origins to the Next.js frontend)
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -51,6 +60,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// backupItem represents a single backup artifact stored in MinIO.
 type backupItem struct {
 	ID        string `json:"id"`
 	Database  string `json:"database"`
@@ -64,6 +74,7 @@ type listBackupsResponse struct {
 	Backups []backupItem `json:"backups"`
 }
 
+// mcObject maps to the JSON structure returned by the `mc ls --json` command.
 type mcObject struct {
 	Key          string `json:"key"`
 	Size         int64  `json:"size"`
@@ -71,6 +82,7 @@ type mcObject struct {
 	Type         string `json:"type"`
 }
 
+// listBackupsHandler fetches and returns the list of available backups from MinIO.
 func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Content-Type", "application/json")
@@ -86,7 +98,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 		bucket = "secure-backups"
 	}
 
-	// Construction de l'alias MinIO pour mc
+	// Construct the MinIO connection alias for the `mc` client
 	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
 	accessKey := os.Getenv("MINIO_ACCESS_KEY")
 	secretKey := os.Getenv("MINIO_SECRET_KEY")
@@ -98,7 +110,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 		mcHost = "http://" + accessKey + ":" + secretKey + "@" + strings.TrimPrefix(minioEndpoint, "http://")
 	}
 
-	// Exécution de la commande d'énumération en JSON
+	// Execute the MinIO client enumeration command outputting JSON
 	cmd := exec.Command("mc", "ls", "--json", "--recursive", "minio/"+bucket)
 	cmd.Env = append(os.Environ(), "MC_HOST_minio="+mcHost)
 
@@ -129,7 +141,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Le Key MinIO ressemble à: postgres-backups/app_production/app_production-2023.dump.enc
+		// Example MinIO Key: postgres-backups/app_production/app_production-2023.dump.enc
 		parts := strings.Split(obj.Key, "/")
 		dbName := "unknown"
 		if len(parts) >= 2 {
@@ -140,7 +152,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 		sizeStr := fmt.Sprintf("%.1f MB", sizeMB)
 
 		backups = append(backups, backupItem{
-			ID:        parts[len(parts)-1], // On utilise le nom final du fichier comme ID unique
+			ID:        parts[len(parts)-1], // Use the final filename as a unique identifier
 			Database:  dbName,
 			Size:      sizeStr,
 			Timestamp: obj.LastModified,
@@ -158,6 +170,7 @@ func listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(listBackupsResponse{Backups: backups})
 }
 
+// backupHandler triggers the execution of the bash backup script.
 func backupHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, backupResponse{
@@ -191,6 +204,7 @@ func backupHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// restoreHandler triggers the execution of the bash restore script.
 func restoreHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, backupResponse{
@@ -200,7 +214,7 @@ func restoreHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Structure pour décoder le JSON envoyé par le frontend
+	// Decode the JSON payload sent by the frontend
 	var req struct {
 		BackupID string `json:"backupId"`
 		Location string `json:"location"`
@@ -244,6 +258,7 @@ func restoreHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// writeJSON is a helper function to send a JSON payload with a specific HTTP status code.
 func writeJSON(w http.ResponseWriter, statusCode int, payload backupResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
