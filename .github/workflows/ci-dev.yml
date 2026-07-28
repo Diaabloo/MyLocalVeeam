@@ -1,3 +1,8 @@
+# ==============================================================================
+# Workflow: CI Pipeline (Dev)
+# Description: Automates testing, scanning, building, and pushing the development
+#              Docker image to GitHub Container Registry (GHCR) upon push to `dev`.
+# ==============================================================================
 name: CI Pipeline (Dev)
 
 on:
@@ -62,7 +67,7 @@ jobs:
         with:
           image-ref: 'mylocalveeam-api:local'
           format: 'table'
-          exit-code: '0' # Affiche les vulnérabilités sans faire échouer le pipeline
+          exit-code: '0' # Display vulnerabilities without failing the pipeline
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -75,7 +80,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Mise en minuscules du propriétaire du dépôt (requis par GHCR)
+      # Convert the repository owner name to lowercase (required by GHCR)
       - name: Lowercase Repository Owner
         run: echo "REPO_OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 

@@ -1,3 +1,8 @@
+# ==============================================================================
+# Workflow: CD Pipeline (Production)
+# Description: Automates testing, scanning, building, and pushing the production
+#              Docker image to GitHub Container Registry (GHCR) upon a merge to `main`.
+# ==============================================================================
 name: CD Pipeline (Production)
 
 on:
@@ -65,7 +70,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Mise en minuscules du propriétaire du dépôt (requis par GHCR)
+      # Convert the repository owner name to lowercase (required by GHCR)
       - name: Lowercase Repository Owner
         run: echo "REPO_OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
