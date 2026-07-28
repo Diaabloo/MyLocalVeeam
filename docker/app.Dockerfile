@@ -1,3 +1,8 @@
+# ==============================================================================
+# Dockerfile: Backend API and Backup Orchestrator
+# Description: Multi-stage build for the Go backend API. Compiles the Go binary
+#              and packages it with necessary utilities (mc, pg_dump, etc.).
+# ==============================================================================
 FROM golang:1.23-alpine AS builder
 
 WORKDIR /src/backend
