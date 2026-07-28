@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Script: backup.sh
+# Description: Performs a hot compressed dump of a PostgreSQL database, retrieves
+#              an encryption key from HashiCorp Vault, encrypts the dump using
+#              OpenSSL, and pushes the secured artifact to MinIO (S3).
+# ==============================================================================
 
 set -euo pipefail
 IFS=$'\n\t'

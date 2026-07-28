@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Script: restore.sh
+# Description: Retrieves an encrypted PostgreSQL database dump from MinIO, fetches
+#              the decryption key from HashiCorp Vault, decrypts it, and restores it.
+# ==============================================================================
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -90,7 +95,7 @@ printf -v MC_HOST_minio '%s' "$minio_url"
 export MC_HOST_minio
 unset MINIO_ACCESS_KEY MINIO_SECRET_KEY
 
-# 1. Identification du fichier à restaurer
+# 1. Identify the target backup file to restore
 if [ -z "$TARGET_BACKUP" ]; then
 	log "No specific backup requested. Discovering the latest one..."
 	LATEST=$(mc ls minio/"${MINIO_BUCKET}/${MINIO_PREFIX}/${PGDATABASE}/" | awk '{print $NF}' | grep '\.dump\.enc$' | sort | tail -n 1 || true)
@@ -108,11 +113,11 @@ else
 	log "Using requested backup target: $MINIO_PATH"
 fi
 
-# 2. Téléchargement depuis MinIO
+# 2. Download from MinIO
 log "Downloading encrypted snapshot from MinIO..."
 mc cp --quiet "$MINIO_PATH" "$encrypted_file"
 
-# 3. Récupération de la clé dans Vault
+# 3. Retrieve encryption key from HashiCorp Vault
 log "Fetching AES-256 decryption key from Vault"
 vault_url="${VAULT_ADDR%/}/v1/${VAULT_SECRET_PATH#/}"
 vault_response="$({
@@ -135,14 +140,14 @@ print(value)
 unset vault_response
 export BACKUP_PASSPHRASE
 
-# 4. Déchiffrement
+# 4. Decrypt the payload
 log "Decrypting snapshot with AES-256-CBC and PBKDF2"
 openssl enc -d -aes-256-cbc -pbkdf2 -iter "$OPENSSL_ITERATIONS" -md sha256 \
 	-in "$encrypted_file" -out "$dump_file" -pass env:BACKUP_PASSPHRASE
 unset BACKUP_PASSPHRASE
 secure_remove "$encrypted_file"
 
-# 5. Restauration de la Base de données
+# 5. Restore the Database
 log "Restoring database via pg_restore (clean & if-exists)..."
 pg_restore \
 	--host="$PGHOST" --port="$PGPORT" --username="$PGUSER" --dbname="$PGDATABASE" \
