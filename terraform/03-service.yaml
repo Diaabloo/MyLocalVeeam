@@ -1,0 +1,17 @@
+# ==============================================================================
+# Kubernetes Service
+# Description: Exposes the API internally or externally via an Azure Load Balancer.
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mylocalveeam-api-service
+  namespace: default
+spec:
+  type: LoadBalancer
+  selector:
+    app: mylocalveeam-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

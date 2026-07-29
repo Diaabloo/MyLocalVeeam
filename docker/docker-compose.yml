@@ -1,0 +1,100 @@
+# ==============================================================================
+# Docker Compose Configuration
+# Description: Defines the local environment for testing MyLocalVeeam, including
+#              PostgreSQL, MinIO, HashiCorp Vault, and the Go Backend API.
+# ==============================================================================
+services:
+  # Simulated production PostgreSQL database
+  production_db:
+    image: postgres:15-alpine
+    container_name: production_db
+    environment:
+      POSTGRES_DB: app_production
+      POSTGRES_USER: ubs_prod_user
+      # Password injected dynamically from the .env file
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+    networks:
+      - veeam_network
+
+  # Object storage server (S3 compatible) to host backups
+  minio-s3:
+    image: minio/minio:latest
+    container_name: minio-s3
+    environment:
+      MINIO_ROOT_USER: minio_root_admin
+      # Administrator password injected from the .env file
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9005:9000"
+      - "9001:9001"
+    volumes:
+      - minio_backup_data:/data
+    networks:
+      - veeam_network
+
+  # HashiCorp Vault Server (KMS) to centralize the encryption key
+  vault_kms:
+    image: hashicorp/vault:1.15
+    container_name: vault_kms
+    cap_add:
+      - IPC_LOCK
+    environment:
+      # Local configuration for Vault's development mode
+      VAULT_DEV_ROOT_TOKEN_ID: veeam-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+      # Passphrase is injected via .env and stored in Vault at startup
+      VAULT_BACKUP_PASSPHRASE: ${VAULT_BACKUP_PASSPHRASE}
+    command: >
+      sh -c "vault server -dev -dev-root-token-id=\"$${VAULT_DEV_ROOT_TOKEN_ID}\" -dev-listen-address=\"$${VAULT_DEV_LISTEN_ADDRESS}\" -log-level=warn & /vault/config/vault-init.sh && wait"
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./vault/config:/vault/config
+    networks:
+      - veeam_network
+
+  # Go Backend API and Backup Orchestrator (MyLocalVeeam)
+  veeam_api:
+    build:
+      context: ..
+      dockerfile: docker/app.Dockerfile
+    container_name: veeam_api
+    ports:
+      - "8080:8080"
+    environment:
+      # Database credentials
+      PGHOST: production_db
+      PGPORT: "5432"
+      PGDATABASE: app_production
+      PGUSER: ubs_prod_user
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Vault connection details to retrieve the passphrase
+      VAULT_ADDR: http://vault_kms:8200
+      VAULT_TOKEN: veeam-root-token
+      VAULT_SECRET_PATH: secret/data/backups/postgres
+      VAULT_SECRET_KEY: passphrase
+      # MinIO connection details to upload backups
+      MINIO_ENDPOINT: http://minio-s3:9000
+      MINIO_ACCESS_KEY: minio_root_admin
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: secure-backups
+    depends_on:
+      - production_db
+      - minio-s3
+      - vault_kms
+    networks:
+      - veeam_network
+
+networks:
+  veeam_network:
+    driver: bridge
+
+volumes:
+  pg_prod_data:
+  minio_backup_data:

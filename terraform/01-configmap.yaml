@@ -1,0 +1,18 @@
+# ==============================================================================
+# Kubernetes ConfigMap
+# Description: Non-sensitive configuration for the Go Backend API.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: default
+data:
+  PGHOST: "10.0.2.4" # IP of the infrastructure VM
+  PGPORT: "5432"
+  PGDATABASE: "app_production"
+  PGUSER: "ubs_prod_user"
+  VAULT_ADDR: "http://10.0.2.4:8200"
+  VAULT_SECRET_PATH: "secret/data/backups/postgres"
+  MINIO_ENDPOINT: "http://10.0.2.4:9000"
+  MINIO_BUCKET: "secure-backups"

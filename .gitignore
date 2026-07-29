@@ -1,0 +1,30 @@
+# Node / Next.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+coverage/
+.vercel/
+**/.vercel/
+.turbo/
+
+# Terraform
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+
+# Secrets & Environment variables
+.env
+**/.env

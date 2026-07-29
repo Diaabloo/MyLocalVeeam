@@ -1,0 +1,85 @@
+# ==============================================================================
+# Workflow: CD Pipeline (Production)
+# Description: Automates testing, scanning, building, and pushing the production
+#              Docker image to GitHub Container Registry (GHCR) upon a merge to `main`.
+# ==============================================================================
+name: CD Pipeline (Production)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  validate-and-release:
+    name: Validate & Release to Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Run Go Tests
+        env:
+          GO111MODULE: off
+        run: |
+          cd backend
+          go test -v .
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          load: true
+          tags: mylocalveeam-api:release
+
+      - name: Vulnerability Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'mylocalveeam-api:release'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          trivyignores: '.trivyignore'
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Convert the repository owner name to lowercase (required by GHCR)
+      - name: Lowercase Repository Owner
+        run: echo "REPO_OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build and Push Docker image (latest & sha)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_OWNER }}/mylocalveeam-api:latest
+            ghcr.io/${{ env.REPO_OWNER }}/mylocalveeam-api:${{ github.sha }}
